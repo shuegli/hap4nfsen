@@ -1,0 +1,23 @@
+--- nfsen-1.3.5-vanilla/etc/nfsen-dist.conf	2010-12-20 23:22:14.000000000 +0100
++++ nfsen-1.3.5-patched/etc/nfsen-dist.conf	2010-12-20 23:22:14.000000000 +0100
+@@ -210,6 +210,7 @@ $syslog_facility = 'local3';
+ @plugins = (
+     # profile    # module
+     # [ '*',     'demoplugin' ],
++    # [ '*',     'HAP4NfSen' ],
+ );
+ 
+ %PluginConf = (
+@@ -225,6 +226,12 @@ $syslog_facility = 'local3';
+ 		# array
+ 		'mary had a little lamb' 
+ 	],
++	HAP4NfSen => {
++		max_history             =>      16, # how many steps can be undone
++		delete_temp_files_after =>      300, # after how many seconds temporary files (svg) should be deleted
++		work_dir                =>      '/tmp/HAP4NfSen/', # workingdir of this plugin
++		image_dir               =>      "$BASEDIR/plugins/", # where to place the resulting pictures (svg). Default value is the place, where pic.php can reach it.
++	},
+ );
+ 
+ #

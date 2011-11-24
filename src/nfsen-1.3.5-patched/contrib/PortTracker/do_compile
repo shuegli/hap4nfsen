@@ -1,0 +1,30 @@
+#!/bin/sh
+set -x
+
+# **** Set these paths ****
+# path of nfdump sources
+NFDUMP="/path/to/nfdump-1.6.1p0"
+# path of rrd include file rrd.h
+RRDINCLUDE=/usr/local/include
+# path of rrd library 
+LIBRRD=/usr/local/lib
+
+# nothing to be changed here
+NFDUMP_OBJ="$NFDUMP/bin"
+NFDUMP_INC=$NFDUMP
+
+# nfdump objects
+OBJ="$NFDUMP_OBJ/util.o $NFDUMP_OBJ/nftree.o $NFDUMP_OBJ/grammar.o $NFDUMP_OBJ/scanner.o $NFDUMP_OBJ/nffile.o $NFDUMP_OBJ/flist.o $NFDUMP_OBJ/nf_common.o $NFDUMP_OBJ/nfx.o $NFDUMP_OBJ/panonymizer.o $NFDUMP_OBJ/rijndael.o $NFDUMP_OBJ/ipconv.o $NFDUMP_OBJ/minilzo.o"
+
+if [ -f "$NFDUMP_OBJ/fts_compat.o" ]; then
+        NFDUMP_OBJ="${NFDUMP_OBJ} $NFDUMP/fts_compat.o"
+fi
+
+INCLUDES="-I $NFDUMP_INC -I $NFDUMP/bin -I$RRDINCLUDE"
+
+CC='gcc  -c  -g -O2 -Wall -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations -Wmissing-noreturn'
+
+$CC -c $INCLUDES nftrack.c
+$CC -c $INCLUDES nftrack_rrd.c 
+$CC -c $INCLUDES nftrack_stat.c
+gcc -o nftrack nftrack.o nftrack_rrd.o nftrack_stat.o $OBJ -L$LIBRRD -lrrd -L/usr/X11R6/lib -L/usr/local/lib

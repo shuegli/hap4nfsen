@@ -1,0 +1,17 @@
+--- nfsen-1.3.5-vanilla/html/nfsen.php	2010-12-20 23:22:14.000000000 +0100
++++ nfsen-1.3.5-patched/html/nfsen.php	2010-12-20 23:22:14.000000000 +0100
+@@ -687,8 +687,12 @@ switch ($label) {
+ 		Process_stat_tab($tab_changed, $profile_changed);
+ 		break;
+ 	case "Plugins":
+-		if ( $tab_changed || !array_key_exists('sub_tab', $_SESSION ))
+-			$_SESSION['sub_tab'] = 0;
++		if ( $tab_changed || !array_key_exists('sub_tab', $_SESSION )) {
++			if(isset($_GET['sub_tab']))
++				$_SESSION['sub_tab'] = intval($_GET['sub_tab']);
++			else
++				$_SESSION['sub_tab'] = 0;
++		}
+  		$plugins  = GetPlugins ();
+ 		if ($_SESSION['sub_tab'] > count($plugins)) {
+ 			SetMessage('error', "Plugin number out of range!");

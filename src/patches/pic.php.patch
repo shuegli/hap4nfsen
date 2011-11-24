@@ -1,0 +1,11 @@
+--- nfsen-1.3.5-vanilla/html/pic.php	2010-12-20 23:22:14.000000000 +0100
++++ nfsen-1.3.5-patched/html/pic.php	2010-12-20 23:22:14.000000000 +0100
+@@ -103,6 +103,8 @@ function GetAnyPic () {
+ 		$type = "gif";
+ 	} else if ( preg_match("/\.jpg$/i", $picture)) {
+ 		$type = "jpg";
++	} else if ( preg_match("/\.svg$/i", $picture)) {
++		$type = "svg+xml";
+ 	} else {
+ 		$fp = fopen("icons/Error.png", 'rb');
+ 		fpassthru($fp);

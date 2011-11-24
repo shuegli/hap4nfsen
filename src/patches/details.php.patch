@@ -1,0 +1,139 @@
+--- nfsen-1.3.5-vanilla/html/details.php	2010-12-20 23:22:14.000000000 +0100
++++ nfsen-1.3.5-patched/html/details.php	2011-06-16 20:24:30.455464507 +0200
+@@ -44,6 +44,17 @@ $LimitScale	  = array ( '-', 'K', 'M', '
+ 
+ $OutputFormatOption = array ( 'auto', 'line', 'long', 'extended');
+ 
++// gets HAP4NfSens plugin id. returns -1 if HAP4NfSen is not installed.
++function getHAP4NfSenId() {
++        $plugins = GetPlugins();
++        for ( $i=0;$i<count($plugins);$i++ ) {
++                $plugin = $plugins[$i];
++                if ($plugin == "HAP4NfSen") {
++                        return $i;
++                }
++        }
++        return -1;
++}
+ 
+ function TimeSlotUpdate ($detail_opts) {
+ 
+@@ -1531,6 +1542,11 @@ function DisplayProcessing() {
+ 	<td align="right">
+ 		<input type="button" name="JSbutton1" value="Clear Form" onClick="ResetProcessingForm()">
+ 		<input type="submit" name="process" value="process" onClick="form_ok=true;" size="1">
++<?php		if (getHAP4NfSenId()!=-1) { // only show graphlet button if HAP4NfSen plugin is active
++        		include("plugins/HAP4NfSen/ip_chooser_include.php");
++			ipChooserButton();
++		}
++?>
+ 	</td>
+ </tr>
+ 
+@@ -1547,7 +1563,7 @@ function DisplayProcessing() {
+ <?php
+ 		if ( !array_key_exists('run', $_SESSION) )
+ 			return;
+-
++		//print var_dump($_SESSION);
+ 		print "<div class='flowlist'>\n";
+ 		$run = $_SESSION['run'];
+ 		if ( $run != null ) {
+@@ -1559,9 +1575,10 @@ function DisplayProcessing() {
+ 			$cmd_opts['profile'] = $_SESSION['profileswitch'];
+ 			$cmd_opts['srcselector'] = implode(':', $process_form['srcselector']);
+ 			print "<pre>\n";
+-
+-			$pattern = '/(\s*)([^\s]+)/';
+-			$replacement = "$1<a href='#null' onClick='lookup(\"$2\", this, event)' title='lookup $2'>$2</a>";
++			$patterns = array();
++			$replacements = array();
++			$patterns[0] = '/(\s*)([^\s]+)/';
++			$replacements[0] = "$1<a href='#null' onClick='lookup(\"$2\", this, event)' title='lookup $2'>$2</a>";
+ 
+ 			ClearMessages();
+ 			$cmd_opts['args'] = "-T $run";
+@@ -1570,6 +1587,66 @@ function DisplayProcessing() {
+ 			if ( !is_array($cmd_out) ) {
+ 				ShowMessages();
+ 			} else {
++        	                $hap4nfsen_id = getHAP4NfSenId();
++        	                if ($hap4nfsen_id >= 0) {
++					// ICMP "port" filter are no currently supported by the HAP4NfSen plugin
++					function isChecked(&$form, $name) { // helper function used to find out, if an option is checked
++						return $form[$name]=="checked";
++					}
++					$ip_and_port_columns = preg_match('/(flow records)/i', $IPStatOption[$process_form['stattype']]) &&
++						((isChecked($process_form,'aggr_srcip') && isChecked($process_form,'aggr_srcport')) ||
++						(isChecked($process_form,'aggr_dstip') && isChecked($process_form,'aggr_dstport')));
++					$ip_contains_port =  $_SESSION["process_form"]["modeselect"]=='0' || !preg_match('/[ip|flow_records]/i', $IPStatOption[$process_form['stattype']]) ||
++								(preg_match('/(flow records)/i', $IPStatOption[$process_form['stattype']]) && !( // no boxes checked
++								isChecked($process_form,'aggr_srcip') || isChecked($process_form,'aggr_srcport') ||
++								isChecked($process_form,'aggr_dstip') || isChecked($process_form,'aggr_dstport')));
++        	                        $_SESSION["plugin"][$hap4nfsen_id]["cmd_opts"] = $cmd_opts;
++					$hap_pic = "<img src=\"plugins/HAP4NfSen/graphviz.png\" valign=\"middle\" border=\"0\" alt=\"HAP\" />";
++					$default_pattern = array_pop($patterns);
++					$default_replacement = array_pop($replacements);
++					if ($ip_contains_port) { // matches cases like ip:port
++						$max_prot_length = 5; // max. port length = 5 chars(highest port number = 65535)
++						for ($i=$max_prot_length;$i>=1;$i--) {
++							$diff = ($max_prot_length-$i); // difference between actual and max port length
++							$ip_port_pattern_icmp = "/(\s*)([^\s|^:]+)(:)(0\s{4}|\d\.\d\s{2}|\d{2}\.\d\|\d\.\d{2}\s|\d{2}\.\d{2})/";
++							$ip_port_pattern_normal = "/(\s*)([^\s|^:]+)(:)([\d|\.]{{$i}})(\s{{$diff}})/";
++							$spaces = '';
++							for ($k=0;$k<$diff;$k++) {$spaces = $spaces . ' ';} // spaces required to align hap viewer icons
++                                                	array_push($patterns, $ip_port_pattern_icmp);
++							array_push($replacements,  $default_replacement .
++								"$3$4 <a href=\"nfsen.php?tab=5&sub_tab=" . $hap4nfsen_id . "&ip=$2&mode=new\" title='HAP graphlet for $2'>$hap_pic</a> ");
++							array_push($patterns, $ip_port_pattern_normal);
++                                                	array_push($replacements,  $default_replacement .
++								"$3$4$spaces <a href=\"nfsen.php?tab=5&sub_tab=" . $hap4nfsen_id . "&ip=$2&port=$4&mode=new\" title='HAP graphlet for $2 on port $4'>$hap_pic</a> ");
++						}
++						array_push($patterns, '/(\sIP\sAddr:Port)/i');
++                                        	array_push($replacements, "$1  $hap_pic");
++					} else {
++						if ($ip_and_port_columns) { // matches cases when both ip and port are available but are located in separate columns
++							// ICMP verion
++							$ip_and_port_pattern = "/(\s*)([^\s]+)(\s+)(0|\d\.\d)/";
++							$ip_and_port_replacement = "$1$2$3$4 " .
++								"<a href=\"nfsen.php?tab=5&sub_tab=" . $hap4nfsen_id . "&ip=$2&mode=new\" title='HAP graphlet for $2'>$hap_pic</a>";
++							array_push($patterns, $ip_and_port_pattern);
++							array_push($replacements, $ip_and_port_replacement);
++							// non-ICMP version with port filter
++                                                        $ip_and_port_pattern = "/(\s*)([^\s]+)(\s*)([\d|.]+)/";
++                                                        $ip_and_port_replacement = "$1$2$3$4 " .
++                                                                "<a href=\"nfsen.php?tab=5&sub_tab=" . $hap4nfsen_id . "&ip=$2&port=$4&mode=new\" title='HAP graphlet for $2 on port $4'>$hap_pic</a>";
++                                                        array_push($patterns, $ip_and_port_pattern);
++                                                        array_push($replacements, $ip_and_port_replacement);
++							array_push($patterns, '/(\s\s(Src\sIP\sAddr\s*Src\sPt|Dst\sIP\sAddr\s*Dst\sPt))/i');
++                                                        array_push($replacements, "$1 $hap_pic");
++						} else { // matches all other cases
++							array_push($patterns, $default_pattern);
++                                        		array_push($replacements,  $default_replacement . 
++								" <a href=\"nfsen.php?tab=5&sub_tab=" . $hap4nfsen_id . "&ip=$2&mode=new\" title='HAP graphlet for $2'>$hap_pic</a>");
++							array_push($patterns, '/(\s(|\s(Src|Dst))\sIP\sAddr)/i');
++                                                	array_push($replacements, "$1 $hap_pic");
++						}
++					}
++	                        }
++
+ 				if ( array_key_exists('arg', $cmd_out) ) {
+ 					print "** nfdump " . $cmd_out['arg'] . "\n";
+ 				}
+@@ -1580,15 +1657,13 @@ function DisplayProcessing() {
+ 					}
+ 				}
+ 				foreach ( $cmd_out['nfdump'] as $line ) {
+-					print preg_replace($pattern, $replacement, $line) . "\n";
++					print preg_replace($patterns, $replacements, $line) . "\n";
+ 				}
+ 			}
+ 			print "</pre>\n";
+ 		}
+ 		print "</div>\n";
+-
+ 	return;
+ 
+ } # End of DisplayProcessing
+-
+ ?>
